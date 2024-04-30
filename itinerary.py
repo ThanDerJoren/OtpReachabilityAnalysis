@@ -9,3 +9,4 @@ class Itinerary:
         self.numberOfTransfers = numberOfTransfers
         self.walkDistance = walkDistance
         self.car = car
+
