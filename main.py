@@ -66,9 +66,12 @@ stopsAsDict = queryAllStops(requestURL)
 allStops = createStopObjects(stopsAsDict)
 allStations = createStations(allStops)
 
+destination = {"lat": 52.25251, "lon":  10.46810}
+test = allStations[0].queryTransitItineraries("2024-04-18", "11:30", end=destination)
+print(test)
 
-for station in allStations:
-    print(station.name, len(station.relatedStops))
+# for station in allStations:
+#     print(station.name, len(station.relatedStops))
 
 # stationsToCSV(allStations)
 

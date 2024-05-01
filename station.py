@@ -1,3 +1,7 @@
+import json
+
+import requests
+
 from stop import Stop # used in relatedStops
 from itinerary import Itinerary
 class Station:
@@ -29,7 +33,7 @@ class Station:
         position = {"lat": self.meanLat, "lon": self.meanLon}
         return position
 
-    def queryItineraries(self, date: str, time: str, transportModes: list, start: dict = None, end: dict = None, url = "http://localhost:8080/otp/gtfs/v1"):
+    def queryTransitItineraries(self, date: str, time: str, start: dict = None, end: dict = None, url = "http://localhost:8080/otp/gtfs/v1"):
         if start is None and end is not None:
             start = self.getPosition()
         elif start is not None and end is None:
@@ -39,4 +43,28 @@ class Station:
         else:
             print("It has to be pass one: start or end, otherwise the route will be from 'A to A'")
 
-        plan = "{plan"
+        plan = f"""
+            {{plan(
+                date: {date},
+                time: {time},
+                from: {{ lat: {start["lat"]}, lon: {start["lon"]}}},
+                to: {{ lat: {end["lat"]}, lon: {end["lon"]}}},
+                transportModes: [{{mode: TRANSIT}}, {{mode: WALK}}]
+                ){{
+                    itineraries{{
+                        startTime,
+                        duration,
+                        numberOfTransfers
+                        walkDistance
+                        legs{{
+                            mode
+                            route{{shortName}}
+                        }}       
+                    }}
+                }}
+            }}
+        """
+        queriedPlans = requests.post(url, json={"query": plan})
+        queriedPlans = json.loads(queriedPlans.content)
+        print("request is done")
+        return queriedPlans
