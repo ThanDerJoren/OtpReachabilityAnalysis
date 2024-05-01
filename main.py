@@ -27,23 +27,49 @@ def stationsToCSV(stationCollection):
             file.write(";".join(map(str, data)) + "\n")
     print("CSV file 'stations.csv' created successfully!!!")
 
+def checkGrizzlyServerIsRunning(url = "http://localhost:8080/")->bool:
+    # TODO flexibel machen
+    try:
+        # Get Url
+        get = requests.get(url)
+        # if the request succeeds
+        if get.status_code == 200:
+            return True
+        else:
+            return False
+        # Exception
+    except requests.exceptions.RequestException as e:
+        # print URL with Errs
+        raise SystemExit(f"{url}: is Not reachable \nErr: {e}")
 
-allStops = []
-allStations = []
 
-queriedStops = requests.post("http://localhost:8080/otp/gtfs/v1", json={"query": "{stops{name, gtfsId, lat, lon, vehicleMode}}"})
-queriedStops = json.loads(queriedStops.content)
-queriedStops = queriedStops["data"]["stops"]
-print(queriedStops[0])
+def queryAllStops(url):
+    if checkGrizzlyServerIsRunning() == True:
+        queriedStops = requests.post(url,json={"query": "{stops{name, gtfsId, lat, lon, vehicleMode}}"})
+        queriedStops = json.loads(queriedStops.content)
+        queriedStops = queriedStops["data"]["stops"]
+        return queriedStops
+    else:
+        print("OTP is not running/ reachable")
 
-for data in queriedStops:
-    stop = Stop(data["name"], data["gtfsId"], data["lat"], data["lon"], data["vehicleMode"])
-    allStops.append(stop)
+def createStopObjects(queriedStops):
+    stopObjects = []
+    for data in queriedStops:
+        stop = Stop(data["name"], data["gtfsId"], data["lat"], data["lon"], data["vehicleMode"])
+        stopObjects.append(stop)
+    return stopObjects.copy()
 
+requestURL = "http://localhost:8080/otp/gtfs/v1"
+
+
+stopsAsDict = queryAllStops(requestURL)
+allStops = createStopObjects(stopsAsDict)
 allStations = createStations(allStops)
+
+
 for station in allStations:
     print(station.name, len(station.relatedStops))
 
-stationsToCSV(allStations)
+# stationsToCSV(allStations)
 
 
