@@ -1,12 +1,16 @@
 class Itinerary:
+    startTime: float
     duration: float
     numberOfTransfers: int
     walkDistance: float
-    car: bool
+    modes = []
+    routeNumbers = []
 
-    def __init(self, duration, numberOfTransfers, walkDistance, car):
+    def __init__(self, startTime, duration, numberOfTransfers, walkDistance, modes, routeNumbers):
+        self.startTime = startTime
         self.duration = duration
         self.numberOfTransfers = numberOfTransfers
         self.walkDistance = walkDistance
-        self.car = car
+        self.modes = modes.copy()
+        self.routeNumbers = routeNumbers.copy()
 

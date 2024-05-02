@@ -3,7 +3,7 @@ from stop import Stop
 from station import Station
 
 
-def createStations (stopCollection):
+def createStations(stopCollection):
     stationCollection = []
     currentStopName = stopCollection[0].name
     relatedStops = [stopCollection[0]]
@@ -59,6 +59,13 @@ def createStopObjects(queriedStops):
         stopObjects.append(stop)
     return stopObjects.copy()
 
+def requestItinerariesForEachStation(stationCollection, date: str, time: str, start: dict = None, end: dict = None, url = "http://localhost:8080/otp/gtfs/v1"):
+    for station in stationCollection:
+        station.possibleItineraries.clear()
+        station.queryTransitItineraries(date, time, start, end)
+
+
+
 requestURL = "http://localhost:8080/otp/gtfs/v1"
 
 
@@ -67,8 +74,20 @@ allStops = createStopObjects(stopsAsDict)
 allStations = createStations(allStops)
 
 destination = {"lat": 52.25251, "lon":  10.46810}
-test = allStations[0].queryTransitItineraries("2024-04-18", "11:30", end=destination)
-print(test)
+#requestItinerariesForEachStation(allStations, "2024-04-18", "11:30", end=destination)
+
+
+
+
+allStations[0].queryTransitItineraries("2024-04-18", "11:30", end=destination)
+allStations[0].filterShortestItinerary()
+for itineray in allStations[0].possibleItineraries:
+    print(itineray.startTime)
+    print(itineray.duration)
+    print(itineray.modes)
+    print(itineray.routeNumbers)
+    print()
+print(allStations[0].name, allStations[0].averageTripTime, allStations[0].averageNumberOfTransfers ,allStations[0].averageWalkDistanceOfTrip)
 
 # for station in allStations:
 #     print(station.name, len(station.relatedStops))
