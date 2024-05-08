@@ -2,6 +2,12 @@ import json
 import datetime
 import requests
 
+from pyrosm import OSM
+import osmnx as ox
+import geopandas as gpd
+import networkx as nx
+from shapely.geometry import Point
+
 from stop import Stop # used in relatedStops
 from itinerary import Itinerary
 class Station:
@@ -104,3 +110,10 @@ class Station:
         self.averageNumberOfTransfers = self.filteredItineraries[0].numberOfTransfers
         self.averageWalkDistanceOfTrip = self.filteredItineraries[0].walkDistance
 
+
+    def calculate_isoline(self, G, G_in_utm, radius = 300):
+        center_node = ox.nearest_nodes(G, self.meanLon, self.meanLat)
+        subgraph = nx.ego_graph(G_in_utm,center_node, radius = radius, distance = "length")
+        node_points = [Point((data["x"], data["y"])) for node, data in subgraph.nodes(data=True)]
+        bounding_poly = gpd.GeoSeries(node_points).unary_union.convex_hull
+        return bounding_poly
