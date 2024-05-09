@@ -7,6 +7,7 @@ import osmnx as ox
 import geopandas as gpd
 import networkx as nx
 from shapely.geometry import Point
+from shapely.geometry import Polygon
 
 from stop import Stop # used in relatedStops
 from itinerary import Itinerary
@@ -15,13 +16,14 @@ class Station:
     meanLat: float = 0.0
     meanLon: float = 0.0
     relatedStops = []
+    isoline: Polygon
 
-    averageTripTime: float
-    carDrivingTime: float
-    travelTimeRatio: float
-    averageNumberOfTransfers: float
-    averageWalkDistanceOfTrip: float
-    tripFrequency: float
+    averageTripTime: float = None
+    carDrivingTime: float = None
+    travelTimeRatio: float = None
+    averageNumberOfTransfers: float = None
+    averageWalkDistanceOfTrip: float = None
+    tripFrequency: float = None
     carItinerary: Itinerary
     possibleItineraries = []
     filteredItineraries = []
@@ -111,9 +113,8 @@ class Station:
         self.averageWalkDistanceOfTrip = self.filteredItineraries[0].walkDistance
 
 
-    def calculate_isoline(self, G, G_in_utm, radius = 300):
+    def calculate_isoline(self, G, radius = 300):
         center_node = ox.nearest_nodes(G, self.meanLon, self.meanLat)
-        subgraph = nx.ego_graph(G_in_utm,center_node, radius = radius, distance = "length")
+        subgraph = nx.ego_graph(G,center_node, radius = radius, distance = "length")
         node_points = [Point((data["x"], data["y"])) for node, data in subgraph.nodes(data=True)]
-        bounding_poly = gpd.GeoSeries(node_points).unary_union.convex_hull
-        return bounding_poly
+        self.isoline = gpd.GeoSeries(node_points).unary_union.convex_hull
