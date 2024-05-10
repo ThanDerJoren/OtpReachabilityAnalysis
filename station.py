@@ -13,42 +13,42 @@ from stop import Stop # used in relatedStops
 from itinerary import Itinerary
 class Station:
     name: str
-    meanLat: float = 0.0
-    meanLon: float = 0.0
-    relatedStops = []
-    isoline: Polygon
+    mean_lat: float = 0.0
+    mean_lon: float = 0.0
+    related_stops = []
+    isochrone: Polygon
 
-    averageTripTime: float = None
-    carDrivingTime: float = None
-    travelTimeRatio: float = None
-    averageNumberOfTransfers: float = None
-    averageWalkDistanceOfTrip: float = None
-    tripFrequency: float = None
-    carItinerary: Itinerary
-    possibleItineraries = []
-    filteredItineraries = []
+    average_trip_time: float = None
+    car_driving_time: float = None
+    travel_time_ratio: float = None
+    average_number_of_transfers: float = None
+    average_walk_distance_of_trip: float = None
+    trip_frequency: float = None
+    car_itinerary: Itinerary
+    possible_itineraries = []
+    filtered_itineraries = []
 
-    def __init__(self, name, relatedStops):
+    def __init__(self, name, related_stops):
         self.name = name
-        self.relatedStops = relatedStops  # pass by value? That's important
-        for stop in self.relatedStops:
-            self.meanLat += stop.lat
-            self.meanLon += stop.lon
-        self.meanLat = self.meanLat/len(self.relatedStops)
-        self.meanLon = self.meanLon/len(self.relatedStops)
+        self.related_stops = related_stops  # pass by value? That's important
+        for stop in self.related_stops:
+            self.mean_lat += stop.lat
+            self.mean_lon += stop.lon
+        self.mean_lat = self.mean_lat / len(self.related_stops)
+        self.mean_lon = self.mean_lon / len(self.related_stops)
 
-    def getPosition(self):
-        position = {"lat": self.meanLat, "lon": self.meanLon}
+    def get_position(self):
+        position = {"lat": self.mean_lat, "lon": self.mean_lon}
         return position
 
-    def queryTransitItineraries(self, date: str, time: str, start: dict = None, end: dict = None, url = "http://localhost:8080/otp/gtfs/v1"):
+    def query_transit_itineraries(self, date: str, time: str, start: dict = None, end: dict = None, url ="http://localhost:8080/otp/gtfs/v1"):
         date = f"\"{date}\""
         time = f"\"{time}\""
 
         if start is None and end is not None:
-            start = self.getPosition()
+            start = self.get_position()
         elif start is not None and end is None:
-            end = self.getPosition()
+            end = self.get_position()
         elif start is not None and end is not None:
             print("The current station has to be either start ot end.\n This function is not intended to plan a route, which dosen't include the current station")
         else:
@@ -81,13 +81,13 @@ class Station:
 
         for element in itineraries:
             modes = []
-            routeNumbers = []
+            route_numbers = []
             for item in element["legs"]:
                 modes.append(item["mode"])
                 if item["route"] is not None:
-                    routeNumbers.append(item["route"]["shortName"])
+                    route_numbers.append(item["route"]["shortName"])
                 else:
-                    routeNumbers.append(item["route"])
+                    route_numbers.append(item["route"])
 
             itinerary = Itinerary(
                 datetime.datetime.fromtimestamp(element["startTime"]/1000.0),  #Unix timestamp in milliseconds to datetime. /1000.0 beacause of milliseconds
@@ -95,26 +95,26 @@ class Station:
                 element["numberOfTransfers"],
                 element["walkDistance"],
                 modes,
-                routeNumbers
+                route_numbers
             )
-            self.possibleItineraries.append(itinerary)
+            self.possible_itineraries.append(itinerary)
         print(f"{self.name}: all itineraries added.")
 
 
-    def filterShortestItinerary(self):  #ATTENTION: Only for developement purpose
-        self.filteredItineraries.clear()
-        self.filteredItineraries.append(self.possibleItineraries[0])
-        for itinerary in self.possibleItineraries:
-            if itinerary.duration < self.filteredItineraries[0].duration:
-                self.filteredItineraries[0] = itinerary
+    def filter_shortest_itinerary(self):  #ATTENTION: Only for developement purpose
+        self.filtered_itineraries.clear()
+        self.filtered_itineraries.append(self.possible_itineraries[0])
+        for itinerary in self.possible_itineraries:
+            if itinerary.duration < self.filtered_itineraries[0].duration:
+                self.filtered_itineraries[0] = itinerary
 
-        self.averageTripTime = self.filteredItineraries[0].duration
-        self.averageNumberOfTransfers = self.filteredItineraries[0].numberOfTransfers
-        self.averageWalkDistanceOfTrip = self.filteredItineraries[0].walkDistance
+        self.average_trip_time = self.filtered_itineraries[0].duration
+        self.average_number_of_transfers = self.filtered_itineraries[0].number_of_transfers
+        self.average_walk_distance_of_trip = self.filtered_itineraries[0].walk_distance
 
 
-    def calculate_isoline(self, G, radius = 300):
-        center_node = ox.nearest_nodes(G, self.meanLon, self.meanLat)
+    def calculate_isochrone(self, G, radius = 300):
+        center_node = ox.nearest_nodes(G, self.mean_lon, self.mean_lat)
         subgraph = nx.ego_graph(G,center_node, radius = radius, distance = "length")
         node_points = [Point((data["x"], data["y"])) for node, data in subgraph.nodes(data=True)]
-        self.isoline = gpd.GeoSeries(node_points).unary_union.convex_hull
+        self.isochrone = gpd.GeoSeries(node_points).unary_union.convex_hull
