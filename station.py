@@ -12,22 +12,9 @@ from shapely.geometry import Polygon
 from stop import Stop # used in relatedStops
 from itinerary import Itinerary
 class Station:
-    name: str
-    mean_lat: float = 0.0
-    mean_lon: float = 0.0
-    related_stops = []
-    isochrone: Polygon
 
-    average_trip_time: float = None
-    car_driving_time: float = None
-    travel_time_ratio: float = None
-    average_number_of_transfers: float = None
-    average_walk_distance_of_trip: float = None
-    trip_frequency: float = None
-    car_itinerary: Itinerary
-    queried_itineraries = []
-    itineraries_with_permissible_catchment_area = []
-    selected_itineraries = []
+
+
 
     def __init__(self, name, related_stops):
         self.name = name
@@ -37,6 +24,18 @@ class Station:
             self.mean_lon += stop.lon
         self.mean_lat = self.mean_lat / len(self.related_stops)
         self.mean_lon = self.mean_lon / len(self.related_stops)
+        self.isochrone: Polygon
+
+        self.average_trip_time: float = None
+        self.car_driving_time: float = None
+        self.travel_time_ratio: float = None
+        self.average_number_of_transfers: float = None
+        self.average_walk_distance_of_trip: float = None
+        self.trip_frequency: float = None
+        self.car_itinerary: Itinerary
+        self.queried_itineraries = []
+        self.itineraries_with_permissible_catchment_area = []
+        self.selected_itineraries = []
 
     def get_position(self):
         position = {"lat": self.mean_lat, "lon": self.mean_lon}
