@@ -41,20 +41,38 @@ def request_itineraries_for_each_station(station_collection, date: str, time: st
 
 def request_itineraries_from_start_to_each_station(station_collection, date: str, time: str, start: dict, start_time):
     possible_start_stations = []
+    possible_start_coordinates = []
+    # first try: find from the start an itinerary to every station
     for item_index, station in enumerate(station_collection):
         station.query_and_create_transit_itineraries(date, time, start=start)
-        print(len(station.queried_itineraries))
         station.filter_itineraries_with_permissible_catchment_area("start")
         station.filter_shortest_itinerary()
         for itinerary in station.itineraries_with_permissible_catchment_area:
             if possible_start_stations.count(itinerary.start_station) == 0:
                 possible_start_stations.append(itinerary.start_station)
-        print(f"{item_index}, {station.name}, shortest itinerary calculated; ")
+    while "" in possible_start_stations: possible_start_stations.remove("") #because of the declaration of stat_station, there can be empty strings in possible_start_station
+    print(f"{item_index}, {station.name}, shortest itinerary calculated; ")
     print("possible start stations: ", possible_start_stations)
+    # get the coordinates of the possible start stations and find max distance
+    max_distance = 0.0
     for station in station_collection:
-        # TODO add the 2nd step, wehere I query orutes from explicite start stations, to find itineraries to endStations, which would be otherwise not reachable
-        pass
-        #if len(station.itineraries_with_permissible_catchment_area) == 0:
+        for start_station in possible_start_stations:
+            if station.name == start_station:
+                start_coordinates = {"lat": station.mean_lat, "lon": station.mean_lon}
+                possible_start_coordinates.append(start_coordinates)
+                station.calculate_max_distance_station_to_stop()
+                if station.max_distance_station_to_stop > max_distance:
+                    max_distance = station.max_distance_station_to_stop
+    # second try: find an itinerary explicit from the possible_start_stations to all stations, which weren't reached in the first try
+    #TODO is this even necessery? or is this not find any additional itinerary?
+    for station in station_collection:
+        if len(station.itineraries_with_permissible_catchment_area) == 0:
+            station.queried_itineraries.clear()
+            for start_coordinate in possible_start_coordinates:
+                station.query_and_create_transit_itineraries(date, time, start=start_coordinate)
+            station.filter_itineraries_with_permissible_catchment_area("start", catchment_area=max_distance)
+            station.filter_shortest_itinerary()
+
 
 
 def create_stop_objects(queried_stops):
@@ -155,7 +173,7 @@ def export_stations_as_geopackage(station_collection):
         mean_lon_collection.append(station.mean_lon)
     station_attributes = create_dataframe_with_station_attributes(station_collection)
     gdf = gpd.GeoDataFrame(station_attributes, geometry=gpd.points_from_xy(mean_lon_collection, mean_lat_collection), crs="EPSG:4326")
-    gdf.to_file("dataframe_Andreeplatz2.gpkg", driver='GPKG', layer='Andreeplatz2_to_all_stations')
+    gdf.to_file("dataframe_braunschweig_hbf.gpkg", driver='GPKG', layer='braunschweig_hbf_to_all_stations')
 
 def export_isochrone_as_geopackage(station_collection):
     name_collection = []
@@ -177,10 +195,11 @@ all_stations = create_stations(all_stops)
 print("all stations are created: ","--- %s seconds ---" % (time.time() - start_time))
 
 andreeplatz2 = {"lat": 52.260760, "lon":  10.548780}
-request_itineraries_from_start_to_each_station(all_stations[0:20], "2024-04-18", "11:30", andreeplatz2, start_time)
+braunschweig_hbf = {"lat": 52.25260, "lon": 10.53908}
+request_itineraries_from_start_to_each_station(all_stations, "2024-04-18", "11:30", braunschweig_hbf, start_time)
 print("all Itineraries are calculated ","--- %s seconds ---" % (time.time() - start_time))
 
-export_stations_as_geopackage(all_stations[0:20])
+export_stations_as_geopackage(all_stations)
 print("all stations are exported ","--- %s seconds ---" % (time.time() - start_time))
 
 # osm = OSM("braunschweig_OPNV-Netz.osm.pbf") #TODO müsste ersetzt werden wenn kein Conda

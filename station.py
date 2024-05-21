@@ -90,7 +90,7 @@ class Station:
         for element in itineraries:
             modes = []
             route_numbers = []
-            start_station = "" # hierdurch entseht der leere eintrag in possible start stations. it needs to be an empty string. If the shortest route is walking, there will be no start station
+            start_station = "" #it needs to be an empty string. If the shortest route is walking, there will be no start station
             end_station = ""
             distance_to_start_station: float
             distance_from_end_station: float
