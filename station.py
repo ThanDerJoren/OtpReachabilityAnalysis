@@ -11,6 +11,7 @@ from shapely.geometry import Polygon
 
 from stop import Stop # used in relatedStops
 from itinerary import Itinerary
+import geopy.distance
 class Station:
 
 
@@ -19,12 +20,15 @@ class Station:
     def __init__(self, name, related_stops):
         self.name = name
         self.related_stops = related_stops  # pass by value? That's important
+        self.mean_lat = 0.0
+        self.mean_lon = 0.0
         for stop in self.related_stops:
             self.mean_lat += stop.lat
             self.mean_lon += stop.lon
         self.mean_lat = self.mean_lat / len(self.related_stops)
         self.mean_lon = self.mean_lon / len(self.related_stops)
         self.isochrone: Polygon
+        self.max_distance_station_to_stop = None
 
         self.average_trip_time: float = None
         self.car_driving_time: float = None
@@ -60,7 +64,7 @@ class Station:
                 from: {{ lat: {start["lat"]}, lon: {start["lon"]}}},
                 to: {{ lat: {end["lat"]}, lon: {end["lon"]}}},
                 transportModes: [{{mode: TRANSIT}}, {{mode: WALK}}]
-                numItineraries: 20
+                numItineraries: 10
                 walkReluctance: 3.0
                 searchWindow: 3600
                 ){{
@@ -124,6 +128,37 @@ class Station:
             )
             self.queried_itineraries.append(itinerary)
 
+    def query_walk_distance(self, start:dict = None, end: dict = None, url ="http://localhost:8080/otp/gtfs/v1"):
+        if start is None and end is not None:
+            start = self.get_position()
+        elif start is not None and end is None:
+            end = self.get_position()
+        elif start is not None and end is not None:
+            print("The current station has to be either start or end.\n This function is not intended to plan a route, which dosen't include the current station")
+        else:
+            print("It has to be pass one: start or end, otherwise the route will be from 'A to A'")
+        plan = f"""
+            {{plan(
+                from: {{ lat: {start["lat"]}, lon: {start["lon"]}}},
+                to: {{ lat: {end["lat"]}, lon: {end["lon"]}}},
+                transportModes: [{{mode: WALK}}]
+                numItineraries: 1
+                ){{
+                    itineraries{{
+                        walkDistance,
+                    }}
+                }}
+            }}
+        """
+        queriedPlan = requests.post(url, json={"query": plan})
+        queriedPlan = json.loads(queriedPlan.content)
+        print(self.name, len(queriedPlan["data"]["plan"]["itineraries"]), start, end)
+        #sometimes, OTP returns an empty list. to prevent an out of bound exception, it iterates through the list, even the max length is 1
+        for itinerary in queriedPlan["data"]["plan"]["itineraries"]:
+            return itinerary["walkDistance"]
+        #return queriedPlan["data"]["plan"]["itineraries"][0]["walkDistance"]
+
+
     def filter_itineraries_with_permissible_catchment_area(self, start_or_end_station, catchment_area = 300):
         if start_or_end_station == "start":
             for itinerary in self.queried_itineraries:
@@ -145,6 +180,31 @@ class Station:
             self.average_number_of_transfers = self.selected_itineraries[0].number_of_transfers
             self.average_walk_distance_of_trip = self.selected_itineraries[0].walk_distance
 
+    def calculate_linear_distance(self, start:dict = None, end: dict = None):
+        if start is None and end is not None:
+            start = self.get_position()
+        elif start is not None and end is None:
+            end = self.get_position()
+        elif start is not None and end is not None:
+            print(
+                "The current station has to be either start or end.\n This function is not intended to plan a route, which dosen't include the current station")
+        else:
+            print("It has to be pass one: start or end, otherwise the route will be from 'A to A'")
+        start_coordiante = (start["lat"], start["lon"])
+        end_coordinate = (end["lat"], start["lon"])
+        return geopy.distance.geodesic(start_coordiante, end_coordinate).m
+
+    def calculate_max_distance_station_to_stop(self):
+        max_distance = 0.0
+        for stop in self.related_stops:
+            end = {"lat": stop.lat, "lon": stop.lon}
+            distance = self.query_walk_distance(end = end)
+            if distance is None: #backup, if OTP dosen't calculate a walk distane
+                distance = self.calculate_linear_distance(end = end)
+            print(self.name, distance)
+            if distance > max_distance:
+                max_distance = distance
+        self.max_distance_station_to_stop = max_distance
 
     def calculate_isochrone(self, G, radius = 300):
         center_node = ox.nearest_nodes(G, self.mean_lon, self.mean_lat) #TODO müsste ersetzt werden, wenn kein conda

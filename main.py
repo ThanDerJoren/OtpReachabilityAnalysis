@@ -76,6 +76,7 @@ def create_stations(stop_collection):
         else:
             station = Station(current_stop_name, related_stops.copy())
             station_collection.append(station)
+            # station.calculate_max_distance_station_to_stop() #-> nur bei butoon station creation, nicht bei routen berechnung, da mache ich das seperat
             current_stop_name = element.name
             related_stops.clear()
             related_stops.append(element)
@@ -91,19 +92,24 @@ def create_dataframe_with_station_attributes(station_collection):
     average_walk_distance_of_trip_collection = []
     trip_frequency_collection = []
     itineraries_collection = []
+    max_distance_station_to_stop_collection = []
     for station in station_collection:
         itineraries_data = ""
         name_collection.append(station.name)
-        average_trip_time_collection.append(station.average_trip_time)
+        if station.average_trip_time is not None:
+            average_trip_time_collection.append(station.average_trip_time)
+        else:
+            average_trip_time_collection.append(-1)
         car_driving_time_collection.append(station.car_driving_time)
         travel_time_ratio_collection.append(station.travel_time_ratio)
         average_number_of_transfers_collection.append(station.average_number_of_transfers)
         average_walk_distance_of_trip_collection.append(station.average_walk_distance_of_trip)
         trip_frequency_collection.append(station.trip_frequency)
         for itinerary in station.selected_itineraries:
-            data = f"{itinerary.route_numbers}, duration: {itinerary.duration}, startStation: {itinerary.start_station}, endStation:{itinerary.end_station}; "
+            data = f"{itinerary.route_numbers}, duration: {itinerary.duration}, startStation: {itinerary.start_station}, endStation:{itinerary.end_station};\n"
             itineraries_data = itineraries_data + data
         itineraries_collection.append(itineraries_data)
+        max_distance_station_to_stop_collection.append(station.max_distance_station_to_stop)
     df = pd.DataFrame(
         {
             "Name": name_collection,
@@ -113,7 +119,8 @@ def create_dataframe_with_station_attributes(station_collection):
             "average_trip_time": average_trip_time_collection,
             "car_driving_time": car_driving_time_collection,
             "average_walk_distance_of_trip": average_walk_distance_of_trip_collection,
-            "itinerary_overview": itineraries_collection
+            "itinerary_overview": itineraries_collection,
+            "max_distance_station_to_stop": max_distance_station_to_stop_collection
         }
     )
     return df
@@ -173,8 +180,8 @@ andreeplatz2 = {"lat": 52.260760, "lon":  10.548780}
 request_itineraries_from_start_to_each_station(all_stations[0:20], "2024-04-18", "11:30", andreeplatz2, start_time)
 print("all Itineraries are calculated ","--- %s seconds ---" % (time.time() - start_time))
 
-# export_stations_as_geopackage(all_stations[0:20])
-# print("all stations are exported ","--- %s seconds ---" % (time.time() - start_time))
+export_stations_as_geopackage(all_stations[0:20])
+print("all stations are exported ","--- %s seconds ---" % (time.time() - start_time))
 
 # osm = OSM("braunschweig_OPNV-Netz.osm.pbf") #TODO müsste ersetzt werden wenn kein Conda
 # street_network = create_street_network(osm) #TODO müsste ersetzt werden wenn kein Conda

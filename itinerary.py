@@ -11,5 +11,5 @@ class Itinerary:
         self.distance_from_end_station = distanceFromEndStation
         self.modes = modes.copy()
         self.route_numbers = routeNumbers.copy()
-        print(startStation, endStation, duration, routeNumbers)
+        #print(startStation, endStation, duration, routeNumbers)
 
