@@ -39,7 +39,7 @@ def request_itineraries_for_each_station(station_collection, date: str, time: st
         station.queried_itineraries.clear()
         station.query_and_create_transit_itineraries(date, time, start, end)
 
-def request_itineraries_from_start_to_each_station(station_collection, date: str, time: str, start: dict, start_time):
+def create_itineraries_from_start_to_each_station(station_collection, date: str, time: str, start: dict, start_time):
     possible_start_stations = []
     possible_start_coordinates = []
     # first try: find from the start an itinerary to every station
@@ -50,8 +50,8 @@ def request_itineraries_from_start_to_each_station(station_collection, date: str
         for itinerary in station.itineraries_with_permissible_catchment_area:
             if possible_start_stations.count(itinerary.start_station) == 0:
                 possible_start_stations.append(itinerary.start_station)
+        print(f"{item_index}, {station.name}, shortest itinerary calculated; ")
     while "" in possible_start_stations: possible_start_stations.remove("") #because of the declaration of stat_station, there can be empty strings in possible_start_station
-    print(f"{item_index}, {station.name}, shortest itinerary calculated; ")
     print("possible start stations: ", possible_start_stations)
     # get the coordinates of the possible start stations and find max distance
     max_distance = 0.0
@@ -72,8 +72,44 @@ def request_itineraries_from_start_to_each_station(station_collection, date: str
                 station.query_and_create_transit_itineraries(date, time, start=start_coordinate)
             station.filter_itineraries_with_permissible_catchment_area("start", catchment_area=max_distance)
             station.filter_shortest_itinerary()
+    for station in station_collection:
+        station.calculate_travel_time_ratio(start=start)
 
-
+def create_itineraries_from_each_station_to_end(station_collection, date:str, time: str, end: dict):
+    possible_end_stations = []
+    possible_end_coordinates = []
+    # first try: find from each station an itinerary to the end
+    for item_index, station in enumerate(station_collection):
+        station.query_and_create_transit_itineraries(date, time, end = end)
+        station.filter_itineraries_with_permissible_catchment_area("end")
+        station.filter_shortest_itinerary()
+        for itinerary in station.itineraries_with_permissible_catchment_area:
+            if possible_end_stations.count(itinerary.end_station) == 0:
+                possible_end_stations.append(itinerary.end_station)
+        print(f"{item_index}, {station.name}, shortest itinerary calculated; ")
+    while "" in possible_end_stations: possible_end_stations.remove("") #because of the declaration of stat_station, there can be empty strings in possible_start_station
+    print("possible end stations: ", possible_end_stations)
+    # get the coordinates of the possible end stations and find max distance
+    max_distance = 0.0
+    for station in station_collection:
+        for end_station in possible_end_stations:
+            if station.name == end_station:
+                end_coordinates = {"lat": station.mean_lat, "lon": station.mean_lon}
+                possible_end_coordinates.append(end_coordinates)
+                station.calculate_max_distance_station_to_stop()
+                if station.max_distance_station_to_stop > max_distance:
+                    max_distance = station.max_distance_station_to_stop
+    # second try: find an itinerary explicit from the possible_start_stations to all stations, which weren't reached in the first try
+    # TODO is this even necessery? or is this not find any additional itinerary?
+    for station in station_collection:
+        if len(station.itineraries_with_permissible_catchment_area) == 0:
+            station.queried_itineraries.clear()
+            for end_coordinate in possible_end_coordinates:
+                station.query_and_create_transit_itineraries(date, time, end=end_coordinate)
+            station.filter_itineraries_with_permissible_catchment_area("end", catchment_area=max_distance)
+            station.filter_shortest_itinerary()
+    for station in station_collection:
+        station.calculate_travel_time_ratio(end=end)
 
 def create_stop_objects(queried_stops):
     # transferred to plugin
@@ -173,7 +209,7 @@ def export_stations_as_geopackage(station_collection):
         mean_lon_collection.append(station.mean_lon)
     station_attributes = create_dataframe_with_station_attributes(station_collection)
     gdf = gpd.GeoDataFrame(station_attributes, geometry=gpd.points_from_xy(mean_lon_collection, mean_lat_collection), crs="EPSG:4326")
-    gdf.to_file("dataframe_braunschweig_hbf.gpkg", driver='GPKG', layer='braunschweig_hbf_to_all_stations')
+    gdf.to_file("dataframe_BraunschweigHBF_as_end.gpkg", driver='GPKG', layer='from_all_stations_to_BraunschweigHBF')
 
 def export_isochrone_as_geopackage(station_collection):
     name_collection = []
@@ -196,7 +232,8 @@ print("all stations are created: ","--- %s seconds ---" % (time.time() - start_t
 
 andreeplatz2 = {"lat": 52.260760, "lon":  10.548780}
 braunschweig_hbf = {"lat": 52.25260, "lon": 10.53908}
-request_itineraries_from_start_to_each_station(all_stations, "2024-04-18", "11:30", braunschweig_hbf, start_time)
+#create_itineraries_from_start_to_each_station(all_stations, "2024-04-18", "11:30", braunschweig_hbf, start_time)
+create_itineraries_from_each_station_to_end(all_stations, "2024-04-18", "11:30", braunschweig_hbf)
 print("all Itineraries are calculated ","--- %s seconds ---" % (time.time() - start_time))
 
 export_stations_as_geopackage(all_stations)

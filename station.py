@@ -36,7 +36,6 @@ class Station:
         self.average_number_of_transfers: float = None
         self.average_walk_distance_of_trip: float = None
         self.trip_frequency: float = None
-        self.car_itinerary: Itinerary
         self.queried_itineraries = []
         self.itineraries_with_permissible_catchment_area = []
         self.selected_itineraries = []
@@ -152,20 +151,48 @@ class Station:
         """
         queriedPlan = requests.post(url, json={"query": plan})
         queriedPlan = json.loads(queriedPlan.content)
-        print(self.name, len(queriedPlan["data"]["plan"]["itineraries"]), start, end)
         #sometimes, OTP returns an empty list. to prevent an out of bound exception, it iterates through the list, even the max length is 1
         for itinerary in queriedPlan["data"]["plan"]["itineraries"]:
             return itinerary["walkDistance"]
         #return queriedPlan["data"]["plan"]["itineraries"][0]["walkDistance"]
 
+    def query_and_set_car_driving_time(self, start:dict = None, end: dict = None, url ="http://localhost:8080/otp/gtfs/v1"):
+        if start is None and end is not None:
+            start = self.get_position()
+        elif start is not None and end is None:
+            end = self.get_position()
+        elif start is not None and end is not None:
+            print("The current station has to be either start or end.\n This function is not intended to plan a route, which dosen't include the current station")
+        else:
+            print("It has to be pass one: start or end, otherwise the route will be from 'A to A'")
+        plan = f"""
+                    {{plan(
+                        from: {{ lat: {start["lat"]}, lon: {start["lon"]}}},
+                        to: {{ lat: {end["lat"]}, lon: {end["lon"]}}},
+                        transportModes: [{{mode: CAR}}]
+                        numItineraries: 1
+                        ){{
+                            itineraries{{
+                                duration,
+                            }}
+                        }}
+                    }}
+                """
+        queriedPlan = requests.post(url, json={"query": plan})
+        queriedPlan = json.loads(queriedPlan.content)
+        for itinerary in queriedPlan["data"]["plan"]["itineraries"]:
+            print(f"car Itinerary:",itinerary["duration"], f"station: {self.name}")
+            self.car_driving_time = itinerary["duration"]/60 # seconds in minutes
 
     def filter_itineraries_with_permissible_catchment_area(self, start_or_end_station, catchment_area = 300):
         if start_or_end_station == "start":
             for itinerary in self.queried_itineraries:
-                if itinerary.distance_to_start_station <= catchment_area:
+                if itinerary.distance_to_start_station <= catchment_area and self.name == itinerary.end_station: # to make sure, that itinerary ends at this exact station and you don't have to walk the last part
                     self.itineraries_with_permissible_catchment_area.append(itinerary)
         elif start_or_end_station == "end":
-            print("from all station to one end is not implemented yet")
+            for itinerary in self.queried_itineraries:
+                if itinerary.distance_from_end_station <= catchment_area and self.name == itinerary.start_station:
+                    self.itineraries_with_permissible_catchment_area.append(itinerary)
         else:
             print("It has to be pass either 'start' or 'end'")
 
@@ -180,6 +207,13 @@ class Station:
             self.average_number_of_transfers = self.selected_itineraries[0].number_of_transfers
             self.average_walk_distance_of_trip = self.selected_itineraries[0].walk_distance
 
+
+    def calculate_travel_time_ratio(self, start:dict = None, end: dict = None, url ="http://localhost:8080/otp/gtfs/v1"):
+        self.query_and_set_car_driving_time(start = start, end=end, url=url)
+        if self.average_trip_time is not None and self.car_driving_time is not None:
+            self.travel_time_ratio = self.average_trip_time/self.car_driving_time
+        else:
+            print("either the station is not reachable with public tranpsort or the travel_time_ratio is calculated before the PT Trip time")
     def calculate_linear_distance(self, start:dict = None, end: dict = None):
         if start is None and end is not None:
             start = self.get_position()
