@@ -34,11 +34,6 @@ def query_all_stops(url):
     else:
         print("OTP is not running/ reachable")
 
-def request_itineraries_for_each_station(station_collection, date: str, time: str, start: dict = None, end: dict = None, url ="http://localhost:8080/otp/gtfs/v1"):
-    for station in station_collection:
-        station.queried_itineraries.clear()
-        station.query_and_create_transit_itineraries(date, time, start, end)
-
 def create_itineraries_from_start_to_each_station(station_collection, date: str, time: str, start: dict, start_time):
     possible_start_stations = []
     possible_start_coordinates = []
